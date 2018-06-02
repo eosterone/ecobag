@@ -25,20 +25,20 @@ public:
     // creates item and initializes count
 
     // @abi action
-    void createitem(const account_name, uint64_t sku, const string& commonname, eosio::asset amount, uint32_t count);
+    void createitem(const account_name, uint64_t sku, const string& commonname, const eosio::asset& amount, int64_t count);
 
     //
     // updates common name,
     // updates amount
 
     // @abi action
-    void updateitem(const account_name, uint64_t sku, const string& commonname, eosio::asset amount);
+    void updateitem(const account_name, uint64_t sku, const string& commonname, const eosio::asset& amount);
 
     // 
     // adds or subtracts count
 
     // @abi action
-    void addstock(const account_name, uint64_t sku, int32_t count);
+    void addstock(const account_name, uint64_t sku, int64_t count);
 
     // 
     // removes the item from inventory
@@ -52,7 +52,7 @@ public:
     void createcart(const account_name owner, const account_name store, const string& title);
 
     // @abi action
-    void addtocart(const account_name owner, uint64_t sku, uint32_t count);
+    void addtocart(const account_name owner, uint64_t sku, int64_t count);
 
     // @abi action
     void clearcart(const account_name owner);
@@ -78,7 +78,7 @@ private:
       account_name store;
       string commonname;  // examples: milk, pasta, toothpaste, can be used
       eosio::asset amount;
-      uint32_t count;
+      int64_t count;
 
       // todo
       // string description; // could be a url
@@ -143,18 +143,18 @@ private:
       string title;               
       uint16_t status;            // int because ABI cannot generate enum
       eosio::asset total;
-      uint64_t receiptId;         
       
       // this vector of struct will change once map or pair is supported in ABI generation
       // see issue https://github.com/EOSIO/eos/issues/354
       struct itempair
       {
         uint64_t sku;
-        uint32_t count;
+        int64_t count;
       };
       //typedef std::map<uint64_t, uint32_t> itemlist;
       typedef eosio::vector<itempair> itemlist;
       itemlist orders;
+      uint64_t receiptId;         
 
       // todo
       // account_name receiver;
@@ -163,7 +163,7 @@ private:
       auto primary_key() const { return owner; }
       //auto get_owner() const { return owner; }
 
-      EOSLIB_SERIALIZE(bag, (id)(owner)(store)(title)(status)(orders)(receiptId))
+      EOSLIB_SERIALIZE(bag, (id)(owner)(store)(title)(status)(total)(orders)(receiptId))
   };
   typedef eosio::multi_index<N(bag), bag>
           bag_table;

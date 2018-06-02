@@ -58,7 +58,7 @@ void ecobag::removeprofile(const account_name account) {
   eosio::print("Profile deleted: ", name{account});
 }
 
-void ecobag::createitem(const account_name store, uint64_t sku, const string& commonname, asset amount, uint32_t count) {
+void ecobag::createitem(const account_name store, uint64_t sku, const string& commonname, const eosio::asset& amount, int64_t count) {
   eosio::require_auth(store);
 
   item_table inventory(_self, _self);
@@ -79,7 +79,7 @@ void ecobag::createitem(const account_name store, uint64_t sku, const string& co
   eosio::print("Product created: ", sku);
 }
 
-void ecobag::updateitem(const account_name store, uint64_t sku, const string& commonname, asset amount) {
+void ecobag::updateitem(const account_name store, uint64_t sku, const string& commonname, const eosio::asset& amount) {
   eosio::require_auth(store);
 
   item_table inventory(_self, _self);
@@ -98,7 +98,7 @@ void ecobag::updateitem(const account_name store, uint64_t sku, const string& co
   eosio::print("Product updated: ", sku);
 }
 
-void ecobag::addstock(const account_name store, uint64_t sku, int32_t count) {
+void ecobag::addstock(const account_name store, uint64_t sku, int64_t count) {
   eosio::require_auth(store);
 
   item_table inventory(_self, _self);
@@ -107,7 +107,7 @@ void ecobag::addstock(const account_name store, uint64_t sku, int32_t count) {
   eosio_assert(itr != inventory.end(), 
                       "Product does not exist, use createitem() first");
 
-  int remains = static_cast<int32_t>(itr->count) + count;
+  int64_t remains = itr->count + count;
   eosio_assert(remains >= 0, 
                       "Cannot reduce more than in stock");
 
@@ -166,7 +166,7 @@ void ecobag::createcart(const account_name owner, const account_name store, cons
   eosio::print("Created cart: ", title, "Start listing items to buy with addtobuy()");
 }
 
-void ecobag::addtocart(const account_name owner, uint64_t sku, uint32_t count) {
+void ecobag::addtocart(const account_name owner, uint64_t sku, int64_t count) {
   eosio::require_auth(owner);
 
   bag_table bags(_self, _self);
@@ -181,24 +181,31 @@ void ecobag::addtocart(const account_name owner, uint64_t sku, uint32_t count) {
   eosio_assert(item != inventory.end(), 
                       "Item SKU not found");
 
-  int remains = item->count - count;
+  int64_t remains = item->count - count;
   eosio_assert(remains >= 0, 
                       "Store has not enough stock of this item");
 
-  asset thisAmount = item->amount * count;
+  eosio::print("addtocart: passed all assertions..");
+
+  //asset thisAmount = item->amount * count;
   // todo: assert owner's balance
+  asset thisAmount{item->amount.amount * count, S(4, SYS)};
+  eosio::print("thisamount: ", thisAmount);
 
   bags.modify(bag, owner, [&](auto& b) {
     bool found = false;
-    for(auto& i : b.orders) {
-      if(i.sku == sku) {
+    for(auto& order : b.orders) {
+      if(order.sku == sku) {
+        eosio::print("addtocart: mod item count");
         found = true;
-        i.count += count;
+        order.count += count;
       }
     }
     if(!found) {
+      eosio::print("addtocart: pushback new order");
       b.orders.push_back({sku, count});
     }
+
     b.status = bag::OrderStatus::updating_orders;
     b.total += thisAmount;
   });
