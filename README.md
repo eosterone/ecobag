@@ -30,46 +30,36 @@ Will be for a simple store-pickup/delivery scenario.
   
   
 # Actions and Sample Usage (WIP)
-  
+see test_scenario.sh for sample usage
+
 # Profile Management  
 profile does not distinguish between store and customer, so that the actions are not tightly dependent on the account.  
   
 related actions:  
-createprofile,  
-updateprofile,  
-removeprofile  
-  
-- cleos push action createprofile '["eosterone", "lazyshopper", "manila"]' -p eosterone // customer account  
-- cleos push action createprofile '["sari_store", "sari_store", "manila"]' -p sari_store // store account  
-- cleos push action createprofile '["eosterone2", "laziershopper", "cebu"]' -p eosterone // recipient account created by customer  
-  
+void createprofile(const account_name account, const string& username, const string& address);  
+void updateprofile(const account_name account, const string& username, const string& address);  
+void removeprofile(const account_name account);  
   
 # Inventory
 adds item to the inventory, keyed by sku and store_account. Items are added by store accounts, and accessed by customers when updating the to-buy list. The to-buy list is a vector of skus found in the inventory table.
   
 related actions:  
-createitem
-addstock,  
-updateitem,  
-removeitem  
-
-- cleos push action createitem '["sari_store", "11112222", "bottled water", "500 ml bottled water", "10", "100"]' -p sari_store
-- cleos push action addstock '["sari_store", "11112222", "-5"] -p sari_store
-
+void createitem(const account_name, uint64_t sku, const string& commonname, const eosio::asset& amount, int64_t count);  
+void updateitem(const account_name, uint64_t sku, const string& commonname, const eosio::asset& amount);  
+void addstock(const account_name, uint64_t sku, int64_t count);  
+void removeitem(const account_name, uint64_t sku);  
+    
 # Cart, Pickup or Delivery, and Transactions
 customer creates the cart which will contain the list of items he wants to buy from the store. It is assumed for now that all items come from the same associated store. The authorized account who will receive/pick up the items is also listed (it can be a different account from the owner). When the customer marks the cart as ready for checkout, the store account takes ownership and prepares the physical items. Upon pickup, both accounts push an action that will trigger the transactions.  
   
 related actions:  
-createcart  
-addtocart,  
-clearcart,    
-checkout,  
-acceptcart,  
-updatecart,
-dotransact,
-
-
-
+void createcart(const account_name owner, const account_name store, const string& title);  
+void addtocart(const account_name owner, uint64_t sku, int64_t count);  
+void clearcart(const account_name owner);  
+void checkoutcart(const account_name owner, const account_name store);  
+void readycart(const account_name owner, const account_name store);  
+void pickup(const account_name owner, const account_name store, bool clear);  
+    
 # Version 2  
 Version 2 will minimize the participation of stores by introducing "personal shopper" and/or "courier"  
         - allows buyer to make multiple bags from different stores  
