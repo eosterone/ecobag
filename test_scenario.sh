@@ -21,12 +21,18 @@ cleos wallet import 5JwHKp1ruHf52TStsdSFF9Lgr5zuZEhvJke4oTVFKYNvUTUYbVh
 cleos wallet import 5JosYAtLGsmUNjgsRVTgZF6oRLpDRsrJGNPze14YQR9yrpJW8cz
 cleos create account eosio lazyfriend EOS8Ahtd3sB1CvjBgZDufbmXaNfnBKQtaxv9Me2ZCLaWfhVLK9viZ EOS6HjvWwpK2iUxZPsnXWTpqdR3R6MUPnRaWFz3U4Ghs3Mg8t4Xn5
 
-# eosio.token SYS
+#------------------------------------------------
+# issue SYS tokens and transfer to test account
+
 cleos wallet import 5JseSEsoVwBH6WRsx5CWYWAe6pNG9tpSc5ARynxCMzUV3X6T7GA
 cleos wallet import 5KKNYgqYmzswcSzi26NFhvcNm6SrogAqCqQv6ZDZWbKoFtnyLBe
 cleos create account eosio token EOS6uLiaG26JQYaEacTkGdWcZVtpRZgvEzEhfvEkwXUs4x6uQekMW EOS6e5wudqwZZnQLXHr9vnjfRLMBajKjDuuA8XLJGqfxhA4hrmg2T
 cleos set contract token ./contracts/eosio.token/ ./contracts/eosio.token/eosio.token.wast ./contracts/eosio.token/eosio.token.abi
 cleos push action token create '{"issuer":"token","maximum_supply":"1000000.0000 SYS","can_freeze":"0","can_recall":"0","can_whitelist":"0"}' -p token
+cleos push action token issue '{"to":"token","quantity":"1000.0000 SYS","memo":""}' -p token
+cleos get table token token accounts
+cleos push action token transfer '{"from":"token","to":"eosterone","quantity":"200.0000 SYS","memo":"for testing"}' -p token
+cleos get table token eosterone accounts
 
 #------------------------------------------------
 # set ecobag account and publish contract to node
@@ -40,6 +46,7 @@ cleos set contract ecobag ../contracts/ecobag/ ../contracts/ecobag/ecobag.wast .
 
 #------------------------------------------------
 # create test profiles
+
 cleos push action ecobag createprofile '["eosterone", "EOSTERONE", "manila"]' -p eosterone
 cleos push action ecobag createprofile '["grocery", "GROCERY", "makati"]' -p grocery
 cleos push action ecobag createprofile '["lazyfriend", "LAZYFRIEND", "cebu"]' -p lazyfriend
@@ -47,6 +54,7 @@ cleos get table ecobag ecobag profile
 
 #------------------------------------------------
 # add items to inventory
+
 cleos push action ecobag createitem '["grocery", "1111", "beercan", "10 SYS", "100"]' -p grocery
 cleos push action ecobag addstock '["grocery", "1111", "-1"]' -p grocery
 cleos push action ecobag createitem '["grocery", "1112", "infantformula", "55 SYS", "25"]' -p grocery
@@ -55,6 +63,7 @@ cleos get table ecobag ecobag item
 
 #------------------------------------------------
 # take orders 
+
 cleos push action ecobag createcart '["eosterone", "grocery", "weeklygroceries"]' -p eosterone
 cleos push action ecobag addtocart '["eosterone", "1111", "8"]' -p eosterone
 cleos push action ecobag addtocart '["eosterone", "1112", "2"]' -p eosterone
@@ -62,10 +71,12 @@ cleos get table ecobag ecobag bag
 
 #------------------------------------------------
 # checkout and do transaction 
+
 cleos push action ecobag checkoutcart '["eosterone", "grocery"] - eosterone -p grocery
 cleos push action ecobag pickup '["eosterone", "grocery"] - eosterone -p grocery
 cleos get table ecobag ecobag bag
 
 #------------------------------------------------
 #check transaction record
+
 cleos get table ecobag ecobag receipt
