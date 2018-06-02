@@ -173,9 +173,10 @@ void ecobag::addtocart(const account_name owner, uint64_t sku, int64_t count) {
 
   auto bag = bags.find(owner);
   eosio_assert(bag != bags.end(), "Cart does not exist");
-  eosio_assert( bag->status != bag::OrderStatus::received_by_store,
+  eosio_assert( (bag->status == bag::OrderStatus::empty) ||
+                (bag->status == bag::OrderStatus::updating_orders),
                 "Orders are being processed. Cannot update list");
-
+  
   item_table inventory(_self, _self);
   auto item = inventory.find(sku);
   eosio_assert(item != inventory.end(), 
@@ -308,39 +309,61 @@ void ecobag::readycart(const account_name store, const account_name owner) {
   });
 }
 
-void ecobag::pickup(const account_name account, const account_name store, bool clear) {
-  eosio::require_auth(account);
+void ecobag::pickup(const account_name owner, const account_name store, bool clear) {
+  eosio::require_auth(owner);
   eosio::require_auth(store);
 
   bag_table bags(_self, _self);
-  auto bag = bags.find(account);
+  auto bag = bags.find(owner);
 
   eosio_assert(bag->status == bag::OrderStatus::ready_for_pickup, "Orders not ready");
   eosio_assert(bag != bags.end(), "Cart does not exist");
  
+  // todo: do transaction
+  // transfer amount (bag->total) from account to store
+
+  eosio::action( std::vector<eosio::permission_level> (1, {owner, N(active)}),
+    N(token), N(transfer), tokentrans{owner, store, bag->total, "some memo"}).send();
+  // getting this error here
+  // Error 3090003: provided keys, permissions, and delays do not satisfy declared authorizations
+  // does not have signatures for it under a provided delay of 0 ms
+
   // create empty receipt, id will be assigned to the cart
   receipt_table receipts(_self, _self);
 
   receipts.emplace(store, [&](auto& rec) {
     rec.id = receipts.available_primary_key();
-    rec.from = account;
+    rec.from = owner;
     rec.to = store;
     rec.amount = bag->total;
     rec.memo = "some_memo";
   });
-  
-  // todo: do transaction
-  // transfer amount (bag->total) from account to store
 
   // forget history or set cart to be reused again
   if(clear) {
     bags.erase(bag);
   }
   else {
-    bags.modify(bag, account, [&] (auto& b) {
+    bags.modify(bag, owner, [&] (auto& b) {
       b.status = bag::OrderStatus::completed;
     });
   }
 
   eosio::print("Transaction Complete");
+}
+
+// @abi action
+void ecobag::reactivate(const account_name owner) {
+  eosio::require_auth(owner);
+
+  bag_table bags(_self, _self);
+  auto bag = bags.find(owner);
+  eosio_assert(bag != bags.end(), "Cart not found. Create one with createcart()");
+  eosio_assert(bag->status == bag::OrderStatus::completed, "Cart is active, nothing to do here.");
+
+  bags.modify(bag, owner, [&](auto& b) {
+      b.status = bag::OrderStatus::waiting_for_store;
+  });
+
+  eosio::print("Reactivated cart: ", bag->title);
 }

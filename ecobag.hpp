@@ -66,6 +66,9 @@ public:
     //// @abi action
     void pickup(const account_name owner, const account_name store, bool clear);
 
+    // @abi action
+    void reactivate(const account_name owner);
+
     //abi action
     //void xfer(const account_name toaccount, const account_name fromaccount, uint64_t sku, uint16_t count);
 
@@ -117,15 +120,24 @@ private:
           profile_table;
 
   // this is the cart, 
-  // we call it a bag with list of orders
   // ownership will transfer to the store after list is updated (after multisig)
   // ownership will go back to the customer after pickup, 
   // so he can delete it or 
-  // let contract auto-create it at a scheduled time (future versions)
+  // let reactivate it a scheduled time (future versions)
 
   // @abi table bag i64
   struct bag
   {
+      // this vector of struct will change once map or pair is supported in ABI generation
+      // see issue https://github.com/EOSIO/eos/issues/354
+      struct itempair
+      {
+        uint64_t sku;
+        int64_t count;
+      };
+      //typedef std::map<uint64_t, uint32_t> itemlist;
+      typedef eosio::vector<itempair> itemlist;
+
       // warning: ABI not generated for enum types
       // use int to refer to OrderStatus
       enum OrderStatus {
@@ -143,16 +155,6 @@ private:
       string title;               
       uint16_t status;            // int because ABI cannot generate enum
       eosio::asset total;
-      
-      // this vector of struct will change once map or pair is supported in ABI generation
-      // see issue https://github.com/EOSIO/eos/issues/354
-      struct itempair
-      {
-        uint64_t sku;
-        int64_t count;
-      };
-      //typedef std::map<uint64_t, uint32_t> itemlist;
-      typedef eosio::vector<itempair> itemlist;
       itemlist orders;
       uint64_t receiptId;         
 
@@ -186,9 +188,19 @@ private:
 
   typedef eosio::multi_index<N(receipt), receipt>
           receipt_table;
+
+  // private struct used by eosio.token transfer action
+  // this make receipt table redundant
+  struct tokentrans {
+    account_name from;
+    account_name to;
+    eosio::asset amount;
+    string memo;
+  };
+
 };
 
-EOSIO_ABI(ecobag, (createprofile)(updateprofile)(removeprofile)(createitem)(updateitem)(addstock)(removeitem)(createcart)(addtocart)(clearcart)(checkoutcart)(readycart)(pickup))
+EOSIO_ABI(ecobag, (createprofile)(updateprofile)(removeprofile)(createitem)(updateitem)(addstock)(removeitem)(createcart)(addtocart)(clearcart)(checkoutcart)(readycart)(pickup)(reactivate))
 
 // notes 
 // method names cannot be more than 13 characters, cannot contain big letters. { 1-5. a-z only }
@@ -200,3 +212,4 @@ EOSIO_ABI(ecobag, (createprofile)(updateprofile)(removeprofile)(createitem)(upda
 // why transactions fail sometimes due to timeout deadline
 // how to organize multiple smart contracts in a big project, ie.. follow single responsibility
 // how to restart nodeos and resync blocks: error producer_plugin.cpp:627 Not producing block because the irreversible block is too old [age:123584s, max:1800s]
+// does struct data alignment matter
