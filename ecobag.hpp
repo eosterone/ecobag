@@ -1,4 +1,5 @@
 #include <eosiolib/eosio.hpp>
+#include <eosiolib/asset.hpp>
 #include <string>
 
 using std::string;
@@ -21,23 +22,23 @@ public:
     /////// store actions
 
     //
-    // creates item and initializes quantity
+    // creates item and initializes count
 
     // @abi action
-    void createitem(const account_name, uint64_t sku, const string& commonname, uint32_t price, uint32_t quantity);
+    void createitem(const account_name, uint64_t sku, const string& commonname, eosio::asset amount, uint32_t count);
 
     //
     // updates common name,
-    // updates price
+    // updates amount
 
     // @abi action
-    void updateitem(const account_name, uint64_t sku, const string& commonname, uint32_t price);
+    void updateitem(const account_name, uint64_t sku, const string& commonname, eosio::asset amount);
 
     // 
-    // adds or subtracts quantity
+    // adds or subtracts count
 
     // @abi action
-    void addstock(const account_name, uint64_t sku, int32_t quantity);
+    void addstock(const account_name, uint64_t sku, int32_t count);
 
     // 
     // removes the item from inventory
@@ -51,21 +52,22 @@ public:
     void createcart(const account_name owner, const account_name store, const string& title);
 
     // @abi action
-    void updatecart(const account_name owner, const string& title, uint16_t status);
-
-    // @abi action
-    void addtocart(const account_name owner, uint64_t sku, uint32_t quantity);
+    void addtocart(const account_name owner, uint64_t sku, uint32_t count);
 
     // @abi action
     void clearcart(const account_name owner);
 
     //// @abi action
-    //void checkoutcart(const account_name owner);
+    void checkoutcart(const account_name owner, const account_name store);
 
-    ////////
+    //// @abi action
+    void readycart(const account_name owner, const account_name store);
+
+    //// @abi action
+    void pickup(const account_name owner, const account_name store, bool clear);
 
     //abi action
-    //void xfer(const account_name toaccount, const account_name fromaccount, uint64_t sku, uint16_t quantity);
+    //void xfer(const account_name toaccount, const account_name fromaccount, uint64_t sku, uint16_t count);
 
 private:
 
@@ -75,8 +77,8 @@ private:
       uint64_t sku;
       account_name store;
       string commonname;  // examples: milk, pasta, toothpaste, can be used
-      uint32_t price;
-      uint32_t quantity;
+      eosio::asset amount;
+      uint32_t count;
 
       // todo
       // string description; // could be a url
@@ -88,7 +90,7 @@ private:
       auto primary_key() const { return sku; }
       account_name get_store() const { return store; }
 
-      EOSLIB_SERIALIZE(item, (sku)(store)(commonname)(price)(quantity))
+      EOSLIB_SERIALIZE(item, (sku)(store)(commonname)(amount)(count))
   };
   typedef eosio::multi_index<N(item), item,
           eosio::indexed_by<N(bystore), eosio::const_mem_fun<item, account_name, &item::get_store>>>
@@ -125,22 +127,23 @@ private:
   struct bag
   {
       // warning: ABI not generated for enum types
-      // use int to refer to Status
-      enum Status
-      {
+      // use int to refer to OrderStatus
+      enum OrderStatus {
           empty,
-          updating_list,
+          updating_orders,
           waiting_for_store,
-          processing,
+          received_by_store,
           ready_for_pickup,
-          received
+          completed
       };
 
-      account_name owner;         // the creator of this list
+      uint64_t id;                // unused: needed when user can create more than 1 bag
+      account_name owner;         
       account_name store;
-      string title;               // description of this bag
+      string title;               
       uint16_t status;            // int because ABI cannot generate enum
-
+      eosio::asset total;
+      uint64_t receiptId;         
       
       // this vector of struct will change once map or pair is supported in ABI generation
       // see issue https://github.com/EOSIO/eos/issues/354
@@ -158,20 +161,42 @@ private:
       // uint64_t timeToPick;
       // uint64_t totalprice;
       auto primary_key() const { return owner; }
+      //auto get_owner() const { return owner; }
 
-      EOSLIB_SERIALIZE(bag, (owner)(store)(title)(status)(orders))
+      EOSLIB_SERIALIZE(bag, (id)(owner)(store)(title)(status)(orders)(receiptId))
   };
   typedef eosio::multi_index<N(bag), bag>
           bag_table;
+  
+  // this is the transaction record, amount will be taken from the cart data
+  // the cart record cannot be reused because user may opt to delete it
+  //
+  // @abi table receipt i64
+  struct receipt
+  {
+      uint64_t id;
+      account_name from;
+      account_name to;
+      eosio::asset amount;
+      std::string memo;
 
+      uint64_t primary_key() const { return id; }
+      EOSLIB_SERIALIZE(receipt, (id)(from)(to)(amount)(memo))
+  };
+
+  typedef eosio::multi_index<N(receipt), receipt>
+          receipt_table;
 };
 
-EOSIO_ABI(ecobag, (createprofile)(updateprofile)(removeprofile)(createitem)(updateitem)(addstock)(removeitem)(createcart)(updatecart)(addtocart)(clearcart))
+EOSIO_ABI(ecobag, (createprofile)(updateprofile)(removeprofile)(createitem)(updateitem)(addstock)(removeitem)(createcart)(addtocart)(clearcart)(checkoutcart)(readycart)(pickup))
 
-// notes and questions
+// notes 
 // method names cannot be more than 13 characters, cannot contain big letters. { 1-5. a-z only }
 // cannot generate ABI if using enum (only vector, struct, class, builtins can be generated)
+// map/pair not supported by ABI, use vector of struct
+
+// questions
 // how to remove wallet lock timeout in keosd
 // why transactions fail sometimes due to timeout deadline
 // how to organize multiple smart contracts in a big project, ie.. follow single responsibility
-// map/pair not supported by ABI, use vector of struct
+// how to restart nodeos and resync blocks: error producer_plugin.cpp:627 Not producing block because the irreversible block is too old [age:123584s, max:1800s]
