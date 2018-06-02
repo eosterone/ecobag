@@ -196,13 +196,13 @@ void ecobag::addtocart(const account_name owner, uint64_t sku, int64_t count) {
     bool found = false;
     for(auto& order : b.orders) {
       if(order.sku == sku) {
-        eosio::print("addtocart: mod item count");
+        eosio::print("mod item count");
         found = true;
         order.count += count;
       }
     }
     if(!found) {
-      eosio::print("addtocart: pushback new order");
+      eosio::print("pushback new itempair");
       b.orders.push_back({sku, count});
     }
 
@@ -241,28 +241,37 @@ void ecobag::checkoutcart(const account_name owner, const account_name store) {
   eosio_assert(bag->store == store, "This order is to be fullfilled by another store");
   //eosio_assert(bag->status == bag::OrderStatus::waiting_for_store, "Orders are not yet final");
 
-  bool verified = false;
-  asset totalAmount{};
-
   item_table items(_self, _self);
 
+  int64_t totalAmount = 0;
+  bool verified = true;
   for(const auto& order : bag->orders) {
 
     auto item = items.find(order.sku);
-    if(item == items.end())
-      break;  // item not found
+    if(item == items.end()) {
+      eosio::print("item not found: ", order.sku);
+      verified = false;
+      break;  
+    }
 
-    if(item->count < order.count)
-      break; // not enough in the inventory
+    if(item->count < order.count) {
+      eosio::print("not enough stock: ", item->count);
+      verified = false;
+      break; 
+    }
 
-    totalAmount += item->amount * order.count;
+    totalAmount += (item->amount.amount * order.count);
   }
+
   eosio_assert(verified, "Not all items are in the store inventory");
-  eosio_assert(totalAmount == bag->total, "Total amount dont match");
+
+  //asset thisAmount{totalAmount, S(4, SYS)};
+  eosio_assert(totalAmount == bag->total.amount, "Total amount dont match");
   // todo verify account balance
   // ...
 
   // storage consumption charged to store
+
   bags.modify(bag, store, [&](auto& b) {
       b.status = bag::OrderStatus::received_by_store;
   });
